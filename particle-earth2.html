@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AC-IntegraL Particle Universe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000005;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    touch-action: none;
+  }
+  canvas { display: block; }
+  #video { display: none; }
+
+  #bloom-overlay {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 1;
+    mix-blend-mode: screen;
+    background: radial-gradient(ellipse 55% 55% at 50% 50%,
+      rgba(80,30,160,0.18) 0%, rgba(20,5,60,0.08) 60%, transparent 100%);
+  }
+
+  #ui {
+    position: fixed;
+    top: 20px; right: 20px;
+    background: rgba(3, 0, 15, 0.80);
+    border: 1px solid rgba(200, 140, 255, 0.4);
+    border-radius: 14px;
+    padding: 16px 20px;
+    backdrop-filter: blur(18px);
+    color: #e9d5ff;
+    min-width: 230px;
+    max-height: 92vh;
+    overflow-y: auto;
+    z-index: 10;
+    box-shadow:
+      0 0 60px rgba(160,60,255,0.25),
+      0 0 120px rgba(100,20,200,0.12),
+      inset 0 0 30px rgba(120,40,255,0.08);
+  }
+  #ui::-webkit-scrollbar { width: 4px; }
+  #ui::-webkit-scrollbar-track { background: transparent; }
+  #ui::-webkit-scrollbar-thumb { background: rgba(180,80,255,0.4); border-radius: 2px; }
+
+  #ui h3 {
+    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
+    color: #d946ef; margin-bottom: 14px;
+    border-bottom: 1px solid rgba(200,80,255,0.25); padding-bottom: 10px;
+    text-shadow: 0 0 10px rgba(217,70,239,0.8);
+  }
+
+  .section-label {
+    font-size: 9px; letter-spacing: 2px; color: rgba(200,140,255,0.5);
+    text-transform: uppercase; margin: 12px 0 6px;
+    border-top: 1px solid rgba(200,80,255,0.12); padding-top: 10px;
+  }
+
+  .control-row { display:flex; flex-direction:column; gap:5px; margin-bottom:11px; }
+  .control-row label { font-size:10px; letter-spacing:2px; color:#c084fc; text-transform:uppercase; }
+  .slider-wrap { display:flex; align-items:center; gap:8px; }
+  input[type=range] {
+    -webkit-appearance:none; width:100%; height:3px;
+    background:rgba(200,80,255,0.25); border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:13px; height:13px; border-radius:50%;
+    background:radial-gradient(circle,#f0abfc 0%,#a855f7 100%);
+    cursor:pointer;
+    box-shadow:0 0 10px rgba(240,100,255,1),0 0 20px rgba(180,50,255,0.7);
+  }
+  .val { font-size:11px; color:#e879f9; min-width:34px; text-align:right; text-shadow:0 0 8px rgba(232,121,249,0.8); }
+
+  /* Color sliders */
+  #glow-slider::-webkit-slider-runnable-track { background: linear-gradient(to right, rgba(200,80,255,0.1), rgba(255,255,255,0.8)); }
+  #sat-slider::-webkit-slider-runnable-track  { background: linear-gradient(to right, #555, #ff4fa0); }
+  #bright-slider::-webkit-slider-runnable-track { background: linear-gradient(to right, #000, #fff); }
+  #hue-slider::-webkit-slider-runnable-track  { background: linear-gradient(to right, #f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+
+  #status {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:rgba(3,0,15,0.82);
+    border:1px solid rgba(200,80,255,0.32);
+    border-radius:8px; padding:8px 28px;
+    color:#c084fc; font-size:11px; letter-spacing:2px;
+    text-align:center; backdrop-filter:blur(12px); z-index:10;
+    pointer-events:none; white-space:nowrap;
+    text-shadow:0 0 12px rgba(192,132,252,0.9);
+    box-shadow:0 0 30px rgba(160,50,255,0.2);
+  }
+
+  #toggle-ui-btn {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 20;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(3,0,15,0.80);
+    border: 1px solid rgba(200,140,255,0.4);
+    color: #e879f9;
+    font-size: 18px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 20px rgba(160,60,255,0.3);
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #toggle-ui-btn:hover {
+    background: rgba(160,40,255,0.3);
+    box-shadow: 0 0 30px rgba(200,80,255,0.6);
+  }
+  #ui {
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  #ui.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(20px);
+  }
+
+  #cam-btn {
+    width:100%; padding:9px;
+    background:rgba(160,40,255,0.15);
+    border:1px solid rgba(200,80,255,0.5);
+    border-radius:7px; color:#e879f9; font-size:10px;
+    letter-spacing:2px; cursor:pointer; transition:all 0.2s; text-transform:uppercase;
+    text-shadow:0 0 8px rgba(232,121,249,0.6);
+    margin-top: 4px;
+  }
+  #cam-btn:hover { background:rgba(160,40,255,0.3); box-shadow:0 0 20px rgba(200,80,255,0.5); }
+
+  .hint { font-size:9px; letter-spacing:1px; color:rgba(180,120,240,0.6); line-height:1.7; margin-top:10px; }
+</style>
+</head>
+<body>
+<div id="bloom-overlay"></div>
+<video id="video" playsinline></video>
+<canvas id="c"></canvas>
+
+<button id="toggle-ui-btn" title="パネル表示/非表示">⚙</button>
+
+<div id="ui">
+  <h3>✦ AC-IntegraL</h3>
+
+  <!-- VISUAL CONTROLS -->
+  <div class="section-label">✦ ビジュアル調整</div>
+
+  <div class="control-row">
+    <label>✨ 輝き強度</label>
+    <div class="slider-wrap">
+      <input type="range" id="glow-slider" min="0.2" max="3.0" step="0.05" value="1.0">
+      <span class="val" id="glow-val">1.0</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>🎨 彩度</label>
+    <div class="slider-wrap">
+      <input type="range" id="sat-slider" min="0.0" max="1.0" step="0.01" value="1.0">
+      <span class="val" id="sat-val">1.0</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>💡 明るさ</label>
+    <div class="slider-wrap">
+      <input type="range" id="bright-slider" min="0.2" max="2.0" step="0.05" value="1.0">
+      <span class="val" id="bright-val">1.0</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>🌈 色相シフト</label>
+    <div class="slider-wrap">
+      <input type="range" id="hue-slider" min="0.0" max="1.0" step="0.01" value="0.0">
+      <span class="val" id="hue-val">0.0</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>🔵 パーティクルサイズ</label>
+    <div class="slider-wrap">
+      <input type="range" id="size-slider" min="0.02" max="0.40" step="0.01" value="0.10">
+      <span class="val" id="size-val">0.10</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>🔭 形状の大きさ</label>
+    <div class="slider-wrap">
+      <input type="range" id="scale-slider" min="0.2" max="3.0" step="0.05" value="1.0">
+      <span class="val" id="scale-val">1.00</span>
+    </div>
+  </div>
+
+  <!-- SYSTEM CONTROLS -->
+  <div class="section-label">⚙ システム設定</div>
+
+  <div class="control-row">
+    <label>拡散強度</label>
+    <div class="slider-wrap">
+      <input type="range" id="spread" min="1" max="10" step="0.1" value="4">
+      <span class="val" id="spread-val">4.0</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>パーティクル数</label>
+    <div class="slider-wrap">
+      <input type="range" id="pcount" min="2000" max="15000" step="500" value="10000">
+      <span class="val" id="pcount-val">10000</span>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <label>回転速度</label>
+    <div class="slider-wrap">
+      <input type="range" id="rotspeed" min="0" max="5" step="0.1" value="1">
+      <span class="val" id="rotspeed-val">1.0</span>
+    </div>
+  </div>
+
+  <button id="cam-btn">📷 カメラ起動</button>
+  <button id="cam-off-btn" style="display:none; width:100%; padding:9px; margin-top:6px; background:rgba(255,40,80,0.15); border:1px solid rgba(255,80,100,0.5); border-radius:7px; color:#ff6b8a; font-size:10px; letter-spacing:2px; cursor:pointer; transition:all 0.2s; text-transform:uppercase; text-shadow:0 0 8px rgba(255,80,100,0.6);">⏹ カメラ停止</button>
+  <div class="hint">
+    ✋ 手を開く → 拡散<br>
+    ✊ 握り拳 → AC-IntegraL<br>
+    ✌️ ピース → Deploy the Future<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; → URL接続
+  </div>
+</div>
+
+<div id="status">✦ パーティクルシステム起動中 ✦</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js" } }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// =============================================
+// CONFIG
+// =============================================
+let PARTICLE_COUNT  = 10000;
+let SPREAD_STRENGTH = 4.0;
+let ROT_SPEED       = 1.0;
+
+// Visual params (controlled by sliders)
+let GLOW_INTENSITY  = 1.0;
+let SATURATION      = 1.0;
+let BRIGHTNESS      = 1.0;
+let HUE_SHIFT       = 0.0;
+let SHAPE_SCALE     = 1.0;
+
+// =============================================
+// STATE
+// =============================================
+let gestureState = 'idle';
+let handPos      = null;
+let touchPos     = null;
+let pointerActive= false;
+let handsReady   = false;
+let peaceUrlSent = false;
+
+// =============================================
+// RENDERER
+// =============================================
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.setClearColor(0x000005, 1);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+camera.position.z = 5.5;
+
+// =============================================
+// STARFIELD
+// =============================================
+function createStarfield(count) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count*3);
+  const col = new Float32Array(count*3);
+  const pal = [[1,.95,.8],[.7,.85,1],[1,.7,.4],[.9,.5,1],[.4,1,.9]];
+  for(let i=0;i<count;i++){
+    const phi=Math.acos(2*Math.random()-1), theta=Math.random()*Math.PI*2;
+    const r=28+Math.random()*12;
+    pos[i*3]=r*Math.sin(phi)*Math.cos(theta);
+    pos[i*3+1]=r*Math.sin(phi)*Math.sin(theta);
+    pos[i*3+2]=r*Math.cos(phi);
+    const c=pal[Math.floor(Math.random()*pal.length)];
+    const b=0.3+Math.random()*0.7;
+    col[i*3]=c[0]*b; col[i*3+1]=c[1]*b; col[i*3+2]=c[2]*b;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(col,3));
+  const mat = new THREE.PointsMaterial({
+    size:.07, vertexColors:true, transparent:true, opacity:.85,
+    blending:THREE.AdditiveBlending, depthWrite:false,
+    map: makeGlowSprite(32,0,false), sizeAttenuation:true,
+  });
+  return new THREE.Points(geo, mat);
+}
+
+// =============================================
+// SPRITE TEXTURE
+// =============================================
+function makeGlowSprite(size, crossLen, hasDiag) {
+  const s=size, half=s/2;
+  const cv=document.createElement('canvas'); cv.width=s; cv.height=s;
+  const ctx=cv.getContext('2d');
+  const g1=ctx.createRadialGradient(half,half,0,half,half,half);
+  g1.addColorStop(0,  'rgba(255,255,255,1.0)');
+  g1.addColorStop(0.05,'rgba(255,240,255,1.0)');
+  g1.addColorStop(0.18,'rgba(255,200,255,0.95)');
+  g1.addColorStop(0.40,'rgba(200,150,255,0.55)');
+  g1.addColorStop(0.65,'rgba(140,80,255,0.20)');
+  g1.addColorStop(0.85,'rgba(80,30,180,0.06)');
+  g1.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle=g1; ctx.fillRect(0,0,s,s);
+  const g2=ctx.createRadialGradient(half,half,0,half,half,half*0.22);
+  g2.addColorStop(0,'rgba(255,255,255,1.0)');
+  g2.addColorStop(.5,'rgba(255,255,255,0.9)');
+  g2.addColorStop(1,'rgba(255,200,255,0)');
+  ctx.fillStyle=g2; ctx.fillRect(0,0,s,s);
+  if(crossLen>0){
+    const armLen=half*crossLen;
+    for(let angle=0;angle<Math.PI;angle+=Math.PI/2){
+      const gS=ctx.createLinearGradient(
+        half+Math.cos(angle)*armLen*.1,half+Math.sin(angle)*armLen*.1,
+        half+Math.cos(angle)*armLen,   half+Math.sin(angle)*armLen);
+      gS.addColorStop(0,'rgba(255,255,255,0.92)');
+      gS.addColorStop(.3,'rgba(220,180,255,0.55)');
+      gS.addColorStop(.7,'rgba(160,80,255,0.18)');
+      gS.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.strokeStyle=gS; ctx.lineWidth=s*0.042; ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(half-Math.cos(angle)*armLen*.08,half-Math.sin(angle)*armLen*.08);
+      ctx.lineTo(half+Math.cos(angle)*armLen,    half+Math.sin(angle)*armLen);
+      ctx.stroke();
+    }
+    if(hasDiag){
+      for(let angle=Math.PI/4;angle<Math.PI*1.25;angle+=Math.PI/2){
+        const armD=armLen*.6;
+        ctx.strokeStyle='rgba(200,150,255,0.35)'; ctx.lineWidth=s*0.022;
+        ctx.beginPath(); ctx.moveTo(half,half);
+        ctx.lineTo(half+Math.cos(angle)*armD,half+Math.sin(angle)*armD); ctx.stroke();
+      }
+    }
+  }
+  return new THREE.CanvasTexture(cv);
+}
+
+const mainSprite = makeGlowSprite(128, 0.88, true);
+const haloSprite = makeGlowSprite(128, 0.0,  false);
+
+// =============================================
+// GALAXY POSITIONS
+// =============================================
+function genGalaxyPositions(n) {
+  const pos = new Float32Array(n * 3);
+
+  const ARMS        = 3;       // number of spiral arms
+  const ARM_SPREAD  = 0.38;    // radial spread per arm
+  const THICKNESS   = 0.22;    // vertical thickness
+  const CORE_RATIO  = 0.20;    // fraction in central bulge
+  const DISK_RATIO  = 0.72;    // fraction in spiral arms
+  // remaining goes to halo/scatter
+
+  const coreN = Math.floor(n * CORE_RATIO);
+  const diskN = Math.floor(n * DISK_RATIO);
+  const haloN = n - coreN - diskN;
+
+  // --- Central bulge ---
+  for(let i=0; i<coreN; i++){
+    const r = Math.pow(Math.random(), 1.8) * 0.55;
+    const phi   = Math.acos(2*Math.random()-1);
+    const theta = Math.random()*Math.PI*2;
+    pos[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+    pos[i*3+1] = r*Math.cos(phi)*0.55; // flatten
+    pos[i*3+2] = r*Math.sin(phi)*Math.sin(theta);
+  }
+
+  // --- Spiral arms ---
+  for(let i=0; i<diskN; i++){
+    const idx = coreN + i;
+    const arm = i % ARMS;
+    const armOffset = (arm / ARMS) * Math.PI * 2;
+
+    // Logarithmic spiral: r grows with angle
+    const t = Math.pow(Math.random(), 0.6); // bias toward outer
+    const r = 0.35 + t * 2.1;
+    const angle = armOffset + t * Math.PI * 3.2   // spiral wind
+                + (Math.random()-0.5) * ARM_SPREAD * (1 + t);
+
+    const x = r * Math.cos(angle);
+    const z = r * Math.sin(angle);
+    const y = (Math.random()-0.5) * THICKNESS * (1 - t*0.5); // thinner at edges
+
+    pos[idx*3]   = x;
+    pos[idx*3+1] = y;
+    pos[idx*3+2] = z;
+  }
+
+  // --- Halo scatter ---
+  for(let i=0; i<haloN; i++){
+    const idx = coreN + diskN + i;
+    const r = 1.5 + Math.random() * 1.2;
+    const phi   = Math.acos(2*Math.random()-1);
+    const theta = Math.random()*Math.PI*2;
+    pos[idx*3]   = r*Math.sin(phi)*Math.cos(theta)*1.3;
+    pos[idx*3+1] = r*Math.cos(phi)*0.35;
+    pos[idx*3+2] = r*Math.sin(phi)*Math.sin(theta)*1.3;
+  }
+
+  return pos;
+}
+
+// =============================================
+// TEXT POSITIONS
+// =============================================
+function genTextPositions(n, lines) {
+  const cw=720, ch=lines.length===1?130:200;
+  const cv=document.createElement('canvas'); cv.width=cw; cv.height=ch;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,cw,ch);
+  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  if(lines.length===1){
+    ctx.font='bold 70px Arial Black,Arial'; ctx.fillText(lines[0],cw/2,ch/2);
+  } else {
+    ctx.font='bold 60px Arial Black,Arial'; ctx.fillText(lines[0],cw/2,ch*0.28);
+    ctx.font='bold 54px Arial Black,Arial'; ctx.fillText(lines[1],cw/2,ch*0.72);
+  }
+  const imgData=ctx.getImageData(0,0,cw,ch).data;
+  const cands=[];
+  for(let y=0;y<ch;y++) for(let x=0;x<cw;x++)
+    if(imgData[(y*cw+x)*4]>100) cands.push({x,y});
+  const pos=new Float32Array(n*3);
+  for(let i=0;i<n;i++){
+    if(!cands.length){pos[i*3]=(Math.random()-.5)*5;pos[i*3+1]=(Math.random()-.5)*1.5;pos[i*3+2]=0;continue;}
+    const c=cands[Math.floor(Math.random()*cands.length)];
+    pos[i*3]  =(c.x/cw-.5)*5.8;
+    pos[i*3+1]=-(c.y/ch-.5)*(lines.length===1?1.4:2.0);
+    pos[i*3+2]=(Math.random()-.5)*0.06;
+  }
+  return pos;
+}
+
+// =============================================
+// PARTICLE TYPE for color tinting
+// galaxy zones: 0=core, 1=arm, 2=halo
+// =============================================
+function buildTypeArray(n) {
+  const t = new Uint8Array(n);
+  const coreN = Math.floor(n*0.20);
+  const diskN = Math.floor(n*0.72);
+  for(let i=0;i<n;i++){
+    if(i<coreN) t[i]=0;
+    else if(i<coreN+diskN) t[i]=1;
+    else t[i]=2;
+  }
+  return t;
+}
+
+// =============================================
+// INIT
+// =============================================
+let galaxyPos = genGalaxyPositions(PARTICLE_COUNT);
+let fistPos   = genTextPositions(PARTICLE_COUNT, ['AC-IntegraL']);
+let peacePos  = genTextPositions(PARTICLE_COUNT, ['Deploy','the Future']);
+
+const hueOff  = new Float32Array(PARTICLE_COUNT);
+const flashPh = new Float32Array(PARTICLE_COUNT);
+let   pType   = buildTypeArray(PARTICLE_COUNT);
+
+for(let i=0;i<PARTICLE_COUNT;i++){
+  hueOff[i] = Math.random()*Math.PI*2;
+  flashPh[i]= Math.random()*100;
+}
+
+const posArr  = new Float32Array(PARTICLE_COUNT*3);
+const velArr  = new Float32Array(PARTICLE_COUNT*3);
+const colArr  = new Float32Array(PARTICLE_COUNT*3);
+const colArr2 = new Float32Array(PARTICLE_COUNT*3);
+
+for(let i=0;i<PARTICLE_COUNT;i++){
+  posArr[i*3]=galaxyPos[i*3]; posArr[i*3+1]=galaxyPos[i*3+1]; posArr[i*3+2]=galaxyPos[i*3+2];
+}
+
+// Main layer
+const geo1 = new THREE.BufferGeometry();
+geo1.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+geo1.setAttribute('color',    new THREE.BufferAttribute(colArr, 3));
+const mat1 = new THREE.PointsMaterial({
+  size:.10, vertexColors:true, transparent:true, opacity:1.0,
+  blending:THREE.AdditiveBlending, depthWrite:false, map:mainSprite, sizeAttenuation:true,
+});
+const pts1 = new THREE.Points(geo1, mat1);
+
+// Halo layer
+const geo2 = new THREE.BufferGeometry();
+geo2.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+geo2.setAttribute('color',    new THREE.BufferAttribute(colArr2, 3));
+const mat2 = new THREE.PointsMaterial({
+  size:.32, vertexColors:true, transparent:true, opacity:.22,
+  blending:THREE.AdditiveBlending, depthWrite:false, map:haloSprite, sizeAttenuation:true,
+});
+const pts2 = new THREE.Points(geo2, mat2);
+
+const group = new THREE.Group();
+group.add(pts1); group.add(pts2);
+scene.add(group);
+
+const stars = createStarfield(2000);
+scene.add(stars);
+
+// =============================================
+// REBUILD
+// =============================================
+function rebuildParticles() {
+  galaxyPos = genGalaxyPositions(PARTICLE_COUNT);
+  fistPos   = genTextPositions(PARTICLE_COUNT, ['AC-IntegraL']);
+  peacePos  = genTextPositions(PARTICLE_COUNT, ['Deploy','the Future']);
+  pType     = buildTypeArray(PARTICLE_COUNT);
+  for(let i=0;i<PARTICLE_COUNT;i++){
+    posArr[i*3]=galaxyPos[i*3]; posArr[i*3+1]=galaxyPos[i*3+1]; posArr[i*3+2]=galaxyPos[i*3+2];
+    velArr[i*3]=0; velArr[i*3+1]=0; velArr[i*3+2]=0;
+    hueOff[i]=Math.random()*Math.PI*2; flashPh[i]=Math.random()*100;
+  }
+  geo1.setAttribute('position', new THREE.BufferAttribute(posArr,3));
+  geo1.setAttribute('color',    new THREE.BufferAttribute(colArr,3));
+  geo2.setAttribute('position', new THREE.BufferAttribute(posArr,3));
+  geo2.setAttribute('color',    new THREE.BufferAttribute(colArr2,3));
+  geo1.attributes.position.needsUpdate=true;
+  geo1.attributes.color.needsUpdate=true;
+  geo2.attributes.position.needsUpdate=true;
+  geo2.attributes.color.needsUpdate=true;
+}
+
+// =============================================
+// UI — SLIDERS
+// =============================================
+function bindSlider(id, valId, setter) {
+  const el = document.getElementById(id);
+  const vl = document.getElementById(valId);
+  el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    setter(v);
+    vl.textContent = v.toFixed(2);
+  });
+}
+
+bindSlider('glow-slider',  'glow-val',   v => GLOW_INTENSITY  = v);
+bindSlider('sat-slider',   'sat-val',    v => SATURATION       = v);
+bindSlider('bright-slider','bright-val', v => BRIGHTNESS       = v);
+bindSlider('hue-slider',   'hue-val',    v => HUE_SHIFT        = v);
+bindSlider('scale-slider', 'scale-val',  v => SHAPE_SCALE      = v);
+bindSlider('spread',       'spread-val', v => SPREAD_STRENGTH  = v);
+bindSlider('rotspeed',     'rotspeed-val',v=> ROT_SPEED        = v);
+bindSlider('size-slider',  'size-val',   v => {
+  mat1.size = v;
+  mat2.size = v * 3.2;
+  mat1.needsUpdate = true;
+  mat2.needsUpdate = true;
+});
+
+// Panel toggle
+const uiEl = document.getElementById('ui');
+const toggleBtn = document.getElementById('toggle-ui-btn');
+let uiVisible = true;
+toggleBtn.addEventListener('click', () => {
+  uiVisible = !uiVisible;
+  if(uiVisible) {
+    uiEl.classList.remove('hidden');
+    toggleBtn.textContent = '⚙';
+    toggleBtn.title = 'パネルを隠す';
+  } else {
+    uiEl.classList.add('hidden');
+    toggleBtn.textContent = '☰';
+    toggleBtn.title = 'パネルを表示';
+  }
+});
+
+document.getElementById('pcount').addEventListener('input', e => {
+  PARTICLE_COUNT = parseInt(e.target.value);
+  document.getElementById('pcount-val').textContent = PARTICLE_COUNT;
+  rebuildParticles();
+});
+
+// =============================================
+// STATUS
+// =============================================
+const statusEl = document.getElementById('status');
+const setStatus = msg => { statusEl.textContent = msg; };
+
+// =============================================
+// GESTURE
+// =============================================
+function detectGesture(lm) {
+  const ext=(tip,pip)=>lm[tip].y<lm[pip].y;
+  const iUp=ext(8,6),mUp=ext(12,10),rUp=ext(16,14),pUp=ext(20,18);
+  if(iUp&&mUp&&!rUp&&!pUp) return 'peace';
+  if(!iUp&&!mUp&&!rUp&&!pUp) return 'fist';
+  if([iUp,mUp,rUp,pUp].filter(Boolean).length>=3) return 'open';
+  return 'idle';
+}
+
+// =============================================
+// MEDIAPIPE
+// =============================================
+document.getElementById('cam-btn').addEventListener('click', async () => {
+  if(handsReady) return;
+  setStatus('カメラ初期化中...');
+  try {
+    const mpHands = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    mpHands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
+    mpHands.onResults(results => {
+      if(results.multiHandLandmarks?.length>0){
+        const lm=results.multiHandLandmarks[0];
+        handPos={x:1-lm[0].x,y:lm[0].y};
+        const g=detectGesture(lm);
+        gestureState=g;
+        if(g==='peace'){
+          setStatus('✌️ ✦ Deploy the Future ✦ URL接続中...');
+          if(!peaceUrlSent){
+            peaceUrlSent=true;
+            setTimeout(()=>{window.open('https://ac-integral.dora.run/','_blank');setTimeout(()=>peaceUrlSent=false,3000);},1000);
+          }
+        } else if(g==='fist'){ setStatus('✊ ✦ AC-IntegraL ✦'); peaceUrlSent=false; }
+        else if(g==='open'){ setStatus('✋ ✦ 拡散中 ✦'); peaceUrlSent=false; }
+        else { setStatus('✦ 手を検出中...'); peaceUrlSent=false; }
+      } else {
+        handPos=null; gestureState='idle';
+        setStatus('✦ 手をかざしてください ✦');
+      }
+    });
+    const video=document.getElementById('video');
+    const mpCam=new Camera(video,{onFrame:async()=>{await mpHands.send({image:video});},width:640,height:480});
+    await mpCam.start();
+    handsReady=true;
+    setStatus('✦ 手をかざしてください ✦');
+    const camBtn=document.getElementById('cam-btn');
+    const offBtn=document.getElementById('cam-off-btn');
+    camBtn.textContent='📷 カメラ起動中';
+    camBtn.style.opacity='0.45';
+    camBtn.style.cursor='default';
+    offBtn.style.display='block';
+
+    offBtn.addEventListener('click', async () => {
+      try {
+        await mpCam.stop();
+        // カメラストリームを完全に停止
+        const tracks = video.srcObject?.getTracks?.() ?? [];
+        tracks.forEach(t => t.stop());
+        video.srcObject = null;
+      } catch(e) { /* ignore */ }
+      handsReady=false;
+      handPos=null;
+      gestureState='idle';
+      camBtn.textContent='📷 カメラ起動';
+      camBtn.style.opacity='1';
+      camBtn.style.cursor='pointer';
+      offBtn.style.display='none';
+      setStatus('✦ カメラ停止済み | 再度起動できます ✦');
+    });
+  } catch(e){ setStatus('カメラエラー: '+e.message); }
+});
+
+// =============================================
+// TOUCH
+// =============================================
+canvas.addEventListener('pointerdown', e=>{
+  pointerActive=true;
+  touchPos={x:e.clientX/innerWidth,y:e.clientY/innerHeight};
+  if(!handsReady){gestureState='open';setStatus('✦ タッチ: 拡散中 ✦');}
+});
+canvas.addEventListener('pointermove', e=>{
+  if(!pointerActive)return;
+  touchPos={x:e.clientX/innerWidth,y:e.clientY/innerHeight};
+});
+canvas.addEventListener('pointerup', ()=>{
+  pointerActive=false; touchPos=null;
+  if(!handsReady){gestureState='idle';setStatus('✦ パーティクルシステム稼働中 ✦');}
+});
+
+// =============================================
+// COLOR UTILS
+// =============================================
+function hslToRgb(h,s,l){
+  const hue2rgb=(p,q,t)=>{
+    if(t<0)t+=1;if(t>1)t-=1;
+    if(t<1/6)return p+(q-p)*6*t;
+    if(t<1/2)return q;
+    if(t<2/3)return p+(q-p)*(2/3-t)*6;
+    return p;
+  };
+  if(s===0)return[l,l,l];
+  const q=l<0.5?l*(1+s):l+s-l*s,p=2*l-q;
+  return[hue2rgb(p,q,h+1/3),hue2rgb(p,q,h),hue2rgb(p,q,h-1/3)];
+}
+function lerp(a,b,t){return a+(b-a)*t;}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+// =============================================
+// ANIMATION
+// =============================================
+const clock = new THREE.Clock();
+let fistTimer=0, peaceTimer=0, autoRotY=0, globalTime=0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.05);
+  globalTime+=dt;
+
+  let iPos=null;
+  if(handsReady&&handPos) iPos=handPos;
+  else if(pointerActive&&touchPos) iPos=touchPos;
+
+  let worldX=0,worldY=0;
+  if(iPos){worldX=(iPos.x-.5)*7;worldY=-(iPos.y-.5)*5;}
+
+  const isInteracting=(handsReady&&gestureState!=='idle')||pointerActive;
+
+  if(gestureState==='fist') fistTimer=Math.min(fistTimer+dt*1.4,1.5);
+  else fistTimer=Math.max(fistTimer-dt*3,0);
+  if(gestureState==='peace') peaceTimer=Math.min(peaceTimer+dt*1.4,1.5);
+  else peaceTimer=Math.max(peaceTimer-dt*3,0);
+
+  const fB=Math.min(fistTimer/0.6,1);
+  const pB=Math.min(peaceTimer/0.6,1);
+  const sB=Math.max(0,1-fB-pB);
+
+  const pA=geo1.attributes.position.array;
+  const cA=geo1.attributes.color.array;
+  const cA2=geo2.attributes.color.array;
+
+  const globalPulse=0.5+0.5*Math.sin(globalTime*1.8);
+  const flashEvent=Math.sin(globalTime*0.33)*Math.sin(globalTime*0.77);
+  const globalFlash=flashEvent>0.92?(flashEvent-0.92)*12.5:0;
+
+  for(let i=0;i<PARTICLE_COUNT;i++){
+    const ix=i*3,iy=i*3+1,iz=i*3+2;
+
+    // Target — SHAPE_SCALE で形状全体の大きさを調整
+    const tx=(galaxyPos[ix]*sB+fistPos[ix]*fB+peacePos[ix]*pB)*SHAPE_SCALE;
+    const ty=(galaxyPos[iy]*sB+fistPos[iy]*fB+peacePos[iy]*pB)*SHAPE_SCALE;
+    const tz=(galaxyPos[iz]*sB+fistPos[iz]*fB+peacePos[iz]*pB)*SHAPE_SCALE;
+
+    let px=pA[ix],py=pA[iy],pz=pA[iz];
+    let vx=velArr[ix],vy=velArr[iy],vz=velArr[iz];
+
+    const stiff=isInteracting?2.0:5.5;
+    const damp=isInteracting?0.87:0.80;
+    vx+=(tx-px)*stiff*dt; vy+=(ty-py)*stiff*dt; vz+=(tz-pz)*stiff*dt;
+
+    // Repulsion
+    if((gestureState==='open'||(pointerActive&&!handsReady))&&iPos){
+      const dx=px-worldX,dy=py-worldY;
+      const dist=Math.sqrt(dx*dx+dy*dy+0.01);
+      const force=SPREAD_STRENGTH*Math.exp(-dist*1.0)/dist;
+      vx+=dx*force*dt; vy+=dy*force*dt;
+      vz+=(Math.random()-.5)*force*0.7*dt;
+    }
+
+    const shim=0.0022+(fB+pB)*0.001;
+    vx+=(Math.random()-.5)*shim; vy+=(Math.random()-.5)*shim; vz+=(Math.random()-.5)*shim*.4;
+    vx*=damp; vy*=damp; vz*=damp;
+    px+=vx; py+=vy; pz+=vz;
+    pA[ix]=px; pA[iy]=py; pA[iz]=pz;
+    velArr[ix]=vx; velArr[iy]=vy; velArr[iz]=vz;
+
+    // =============================================
+    // COLOR — with slider controls applied
+    // =============================================
+    const speed=Math.sqrt(vx*vx+vy*vy+vz*vz);
+    const pt=pType[i]; // 0=core,1=arm,2=halo
+
+    // Galaxy zone color bias (base hue range)
+    // Core: warm gold/orange, Arms: full rainbow, Halo: cool blue/violet
+    const zoneHueBias = pt===0 ? 0.10 : pt===2 ? 0.65 : 0.0;
+    const zoneCycleSpeed = pt===0 ? 0.3 : pt===1 ? 0.8 : 0.5;
+
+    const rawHue = ((globalTime*zoneCycleSpeed + hueOff[i]) % (Math.PI*2)) / (Math.PI*2);
+    // Blend toward zone bias for core/halo
+    const hueBlendStr = pt===1 ? 0.0 : 0.45;
+    let hue = rawHue*(1-hueBlendStr) + zoneHueBias*hueBlendStr;
+
+    // Apply HUE_SHIFT slider
+    hue = (hue + HUE_SHIFT) % 1.0;
+
+    // Pulse
+    const f1=Math.sin(globalTime*5.5+flashPh[i]*2.1);
+    const f2=Math.sin(globalTime*3.2+flashPh[i]*1.3);
+    const f3=Math.sin(globalTime*8.1+flashPh[i]*0.7);
+    const rawPulse=f1*0.35+f2*0.40+f3*0.25;
+    const pulsed=0.68+rawPulse*0.32;
+    const speedBoost=Math.min(speed*18,0.55);
+    const ringFactor=pt===1?1.15:1.0;
+
+    // Base lightness — apply BRIGHTNESS slider
+    let light=clamp((pulsed*0.72+speedBoost+globalPulse*0.08+globalFlash*0.3)*ringFactor*BRIGHTNESS, 0, 1.0);
+
+    // Apply SATURATION slider
+    const sat=clamp(SATURATION, 0, 1.0);
+
+    let [r,g,b]=hslToRgb(hue, sat, light);
+
+    // Apply GLOW_INTENSITY: scale the output colors
+    r=clamp(r*GLOW_INTENSITY,0,1);
+    g=clamp(g*GLOW_INTENSITY,0,1);
+    b=clamp(b*GLOW_INTENSITY,0,1);
+
+    // Gesture overrides
+    if(fB>0.01){
+      r=lerp(r,clamp(1.0*GLOW_INTENSITY,0,1),fB*.7);
+      g=lerp(g,clamp(0.88*GLOW_INTENSITY,0,1),fB*.5);
+      b=lerp(b,clamp(0.15*GLOW_INTENSITY,0,1),fB*.7);
+    }
+    if(pB>0.01){
+      r=lerp(r,clamp(0.45*GLOW_INTENSITY,0,1),pB*.55);
+      g=lerp(g,clamp(0.90*GLOW_INTENSITY,0,1),pB*.5);
+      b=lerp(b,clamp(1.0*GLOW_INTENSITY,0,1),pB*.7);
+    }
+
+    // Random super-flash
+    const sparkChance=(globalTime*97.3+flashPh[i]*13.7)%1.0;
+    if(sparkChance>0.992){r=1;g=1;b=1;}
+
+    cA[ix]=r; cA[iy]=g; cA[iz]=b;
+
+    // Halo: offset hue for iridescence
+    const hue2=(hue+0.12)%1.0;
+    let[hr,hg,hb]=hslToRgb(hue2,sat*.7,light*.9);
+    hr=clamp(hr*GLOW_INTENSITY,0,1); hg=clamp(hg*GLOW_INTENSITY,0,1); hb=clamp(hb*GLOW_INTENSITY,0,1);
+    cA2[ix]=hr; cA2[iy]=hg; cA2[iz]=hb;
+  }
+
+  geo1.attributes.position.needsUpdate=true;
+  geo1.attributes.color.needsUpdate=true;
+  geo2.attributes.position.needsUpdate=true;
+  geo2.attributes.color.needsUpdate=true;
+
+  mat1.opacity=clamp((0.88+globalPulse*0.12+globalFlash*0.15)*GLOW_INTENSITY,0,1);
+  mat2.opacity=clamp((0.18+globalPulse*0.10+globalFlash*0.12)*GLOW_INTENSITY,0,.55);
+
+  // Rotation
+  const textBlend=Math.max(fB,pB);
+  if(textBlend<0.5){
+    autoRotY+=dt*0.08*ROT_SPEED;
+    group.rotation.y=lerp(group.rotation.y,autoRotY,0.04);
+    group.rotation.x=lerp(group.rotation.x,Math.sin(globalTime*0.10)*0.12,0.02);
+  } else {
+    group.rotation.y=lerp(group.rotation.y,0,dt*1.8);
+    group.rotation.x=lerp(group.rotation.x,0,dt*1.8);
+  }
+
+  stars.rotation.y=globalTime*0.004;
+  stars.rotation.x=Math.sin(globalTime*0.003)*0.05;
+
+  renderer.render(scene,camera);
+}
+
+// =============================================
+// RESIZE
+// =============================================
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+
+// =============================================
+// START
+// =============================================
+setStatus('✦ パーティクルシステム稼働中 | カメラを起動してください ✦');
+animate();
+</script>
+</body>
+</html>
